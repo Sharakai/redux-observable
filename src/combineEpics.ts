@@ -1,11 +1,36 @@
-import { Action } from 'redux';
 import { merge } from 'rxjs';
-import { Epic } from './epic';
+import { Epic, ExtractEpicGeneric } from './epic';
 
 /**
-  Merges all epics into a single one.
+ * Infers the array element type
+ *
+ * @example
+ * ElementType<number[]> === number
+ * ElementType<(string | number)[]> === string | number
  */
-export function combineEpics<T extends Action, O extends T = T, S = void, D = any>(...epics: Epic<T, O, S, D>[]): Epic<T, O, S, D> {
+type ElementType<A> = A extends Iterable<infer I> ? I : never;
+
+/**
+ * Converts a type-union to intersection
+ *
+ * @example
+ * UnionToIntersection<A | B | C> === A & B & B
+ */
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
+  k: infer I
+) => void
+  ? I
+  : never;
+
+/**
+ * Merges all epics into a single one.
+ */
+export function combineEpics<Epics extends Epic[]>(...epics: Epic[]): Epic<
+  ExtractEpicGeneric<ElementType<Epics>, 'input' | 'output'>,
+  ExtractEpicGeneric<ElementType<Epics>, 'output'>,
+  UnionToIntersection<ExtractEpicGeneric<ElementType<Epics>, 'state'>>,
+  UnionToIntersection<ExtractEpicGeneric<ElementType<Epics>, 'dependencies'>>
+> {
   const merger = (...args: Parameters<Epic>) => merge(
     ...epics.map(epic => {
       const output$ = epic(...args);
